@@ -30,5 +30,52 @@ if(cluster.isPrimary) {
     });
 
     //setting up comms between workers and primary
-    setupPrimary
+    setupPrimary();
+    cluster.setupPrimary({
+        serialization: "least-connection"
+    });
+
+    // Launching workers based on the number of CPU threads.
+    for (let i = 0; i < numCPUs; i++) {
+        cluster.fork();
+    }
+
+    cluster.on('exit', (worker, code, signal) => {
+        console.log(`worker ${worker.process.pid} died`);
+    });
+
+    
+} else {
+    /**
+     * Setting up the worker threads
+     */
+
+    console.log(`Worker ${process.pid} has started`);
+
+    /**
+     * Create the express app and socket.io server then bind them to http server
+     */
+
+    const app = express();
+    const httpServer = http.createServer(app);
+    const io = new Server(httpServer);
+
+    //Using the cluster socket .io adapter
+    io.adapter(createAdapter());
+
+    //Setting up worker connection with primary thread
+
+    setupWorker(io);
+
+   io.on("connection", (socket) => {
+    //Handling the socket connections
+    socket.on("message", (data) => {
+        console.log(`Message arrived at ${process.pid}`);
+    });
+   });
+
+   //handle HTTP requests
+   app.get("/", (req, res) => {
+    res.send("Hello World")
+   });
 }
